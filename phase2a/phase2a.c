@@ -134,13 +134,11 @@ P2_Spawn(char *name, int(*func)(void *arg), void *arg, int stackSize, int priori
     if ((USLOSS_PsrGet() & USLOSS_PSR_CURRENT_MODE) == 0){
         USLOSS_IllegalInstruction();
     }
-    int rc;
+    int rc=P1_SUCCESS;
     currentFunc = func;
     rc = P1_Fork(name,wrapper,arg,stackSize,priority,TAG_USER,pid);
-    if(rc!=P1_SUCCESS){
-        return rc;
-    }
-    return P1_SUCCESS;
+
+    return rc;
 }
 
 /*
@@ -157,11 +155,9 @@ P2_Wait(int *pid, int *status)
     if ((USLOSS_PsrGet() & USLOSS_PSR_CURRENT_MODE) == 0){
         USLOSS_IllegalInstruction();
     }
-    int rc;
+    int rc=P1_SUCCESS;
     rc= P1_Join(TAG_USER,pid,status);
-    if(rc!=P1_SUCCESS){
-        return rc;
-    }
+
     return P1_SUCCESS;
 }
 
