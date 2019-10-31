@@ -25,10 +25,11 @@ typedef struct DiskRequest{
 
 typedef struct Disk{
     int pid;
+    int tracks;
     DiskRequest *requestQhead;
 }Disk;
 
-static Disk disks[USLOSS_DISK_UNITS];
+static Disk disks[2];
 static int requestSem;
 
 void enQ(int unit, DiskRequest *request){
@@ -64,8 +65,20 @@ P2DiskInit(void)
 {
     int rc;
     // initialize data structures here
-    for(int i=0;i<USLOSS_DISK_UNITS;i++){
+    for(int i=0;i<2;i++){
         disks[i].requestQhead=NULL;
+        USLOSS_DeviceRequest trackRequest;
+        int *tracks=malloc(sizeof(int));
+        trackRequest.opr=USLOSS_DISK_TRACKS;
+        trackRequest.reg1=(void*) tracks;
+        int rc,status;
+        rc=USLOSS_DeviceOutput(USLOSS_DISK_DEV,i,&trackRequest);
+        if(rc==P1_SUCCESS){
+            rc=P1_WaitDevice(USLOSS_DISK_DEV, i, &status);
+            disks[i].tracks=*tracks;
+        }else{
+            disks[i].tracks=0;
+        }
     }
 
     rc = P1_SemCreate("Request_Sem",0,&requestSem);
@@ -83,7 +96,6 @@ P2DiskInit(void)
     assert(rc == P1_SUCCESS);
     rc = P1_Fork("Disk2_Driver", DiskDriver, (void*) 1, USLOSS_MIN_STACK, 2 , 0, &disks[1].pid);
     assert(rc == P1_SUCCESS);
-
 }
 
 /*
@@ -98,7 +110,7 @@ P2DiskShutdown(void)
     int rc;
     int status;
     rc=P1_SemFree(requestSem);
-    for(int i =0;i<USLOSS_DISK_UNITS;i++){
+    for(int i =0;i<2;i++){
         DiskRequest *tmp;
         tmp = disks[i].requestQhead;
         while(disks[i].requestQhead!=NULL){
@@ -140,17 +152,25 @@ DiskDriver(void *arg)
         }
         if(disks[unit].requestQhead!=NULL){
             DiskRequest *tmp=disks[unit].requestQhead;
+            int trackIndex=tmp->track;
+            int sectorIndex=tmp->first;
+            USLOSS_DeviceRequest seekRequest;
+            seekRequest.opr=USLOSS_DISK_SEEK;
+            seekRequest.reg1=(void*) trackIndex;
+            rc=USLOSS_DeviceOutput(USLOSS_DISK_DEV,unit,&seekRequest);
+            rc=P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
             for (int i = 0; i < tmp->sectors; i++){
-                int index = (tmp->first+i)%USLOSS_DISK_SECTOR_SIZE;
-                tmp->request.reg1 =(void *) index;
+                sectorIndex++;
+                if(sectorIndex>=USLOSS_DISK_TRACK_SIZE){
+                    trackIndex++;
+                    seekRequest.reg1=(void*) trackIndex;
+                    rc=USLOSS_DeviceOutput(USLOSS_DISK_DEV,unit,&seekRequest);
+                    rc=P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
+                    sectorIndex=sectorIndex%USLOSS_DISK_TRACK_SIZE;
+                }
+                tmp->request.reg1 =(void *) sectorIndex;
                 tmp->request.reg2 = tmp->buffer+USLOSS_DISK_SECTOR_SIZE*i;
                 rc=USLOSS_DeviceOutput(USLOSS_DISK_DEV,unit,&tmp->request);
-                if(rc== USLOSS_DEV_ERROR){
-                    //todo handle disk not exist
-                    //P1_INVALID_UNIT 
-                    //Test 1
-                    //https://piazza.com/class/jzd76blzr7d74v?cid=321
-                }
                 rc=P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
             }
             deQ(unit);
@@ -177,13 +197,13 @@ P2_DiskRead(int unit, int track, int first, int sectors, void *buffer)
     if(unit!=0&&unit!=1){
         return P1_INVALID_UNIT;
     }
-    if(track<0||track>=USLOSS_DISK_TRACK_SIZE){
+    if(track<0||track>=disks[unit].tracks){
         return P2_INVALID_TRACK;
     }
-    if(first<0||first>=USLOSS_DISK_SECTOR_SIZE){
+    if(first<0||first>=USLOSS_DISK_TRACK_SIZE){
         return P2_INVALID_FIRST;
     }
-    if(sectors<0||(first+sectors)/USLOSS_DISK_SECTOR_SIZE+track>=USLOSS_DISK_TRACK_SIZE){
+    if(sectors<0||(first+sectors)/USLOSS_DISK_TRACK_SIZE+track>=disks[unit].tracks){
         return P2_INVALID_SECTORS;
     }
     if(buffer==NULL){
@@ -198,8 +218,8 @@ P2_DiskRead(int unit, int track, int first, int sectors, void *buffer)
     diskRequest->buffer=buffer;
     diskRequest->next=NULL;
     enQ(unit,diskRequest);
-    rc=USLOSS_DeviceInput(USLOSS_DISK_DEV, 0,&status);
-    rc=P1_WakeupDevice(USLOSS_DISK_DEV, 0,status,FALSE);
+    rc=USLOSS_DeviceInput(USLOSS_DISK_DEV, unit,&status);
+    rc=P1_WakeupDevice(USLOSS_DISK_DEV, unit,status,FALSE);
     // wait until device driver completes the request
     rc = P1_P(requestSem);
     return P1_SUCCESS;
@@ -216,13 +236,13 @@ P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer)
     if(unit!=0&&unit!=1){
         return P1_INVALID_UNIT;
     }
-    if(track<0||track>=USLOSS_DISK_TRACK_SIZE){
+    if(track<0||track>=disks[unit].tracks){
         return P2_INVALID_TRACK;
     }
-    if(first<0||first>=USLOSS_DISK_SECTOR_SIZE){
+    if(first<0||first>=USLOSS_DISK_TRACK_SIZE){
         return P2_INVALID_FIRST;
     }
-    if(sectors<0||(first+sectors)/USLOSS_DISK_SECTOR_SIZE+track>=USLOSS_DISK_TRACK_SIZE){
+    if(sectors<0||(first+sectors)/USLOSS_DISK_TRACK_SIZE+track>=disks[unit].tracks){
         return P2_INVALID_SECTORS;
     }
     if(buffer==NULL){
@@ -237,8 +257,8 @@ P2_DiskWrite(int unit, int track, int first, int sectors, void *buffer)
     diskRequest->buffer=buffer;
     diskRequest->next=NULL;
     enQ(unit,diskRequest);
-    rc=USLOSS_DeviceInput(USLOSS_DISK_DEV, 0,&status);
-    rc=P1_WakeupDevice(USLOSS_DISK_DEV, 0,status,FALSE);
+    rc=USLOSS_DeviceInput(USLOSS_DISK_DEV, unit,&status);
+    rc=P1_WakeupDevice(USLOSS_DISK_DEV, unit,status,FALSE);
     // wait until device driver completes the request
     rc = P1_P(requestSem);
     return P1_SUCCESS;
@@ -256,7 +276,9 @@ P2_DiskSize(int unit, int *sector, int *track,int *disk)
     if(sector==NULL||track==NULL||disk==NULL){
         return P2_NULL_ADDRESS;
     }
-
+    *sector=USLOSS_DISK_SECTOR_SIZE;
+    *track=USLOSS_DISK_TRACK_SIZE;
+    *disk=disks[unit].tracks;
     return P1_SUCCESS;
 }
 
