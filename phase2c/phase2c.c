@@ -145,6 +145,12 @@ DiskDriver(void *arg)
                 tmp->request.reg1 =(void *) index;
                 tmp->request.reg2 = tmp->buffer+USLOSS_DISK_SECTOR_SIZE*i;
                 rc=USLOSS_DeviceOutput(USLOSS_DISK_DEV,unit,&tmp->request);
+                if(rc== USLOSS_DEV_ERROR){
+                    //todo handle disk not exist
+                    //P1_INVALID_UNIT 
+                    //Test 1
+                    //https://piazza.com/class/jzd76blzr7d74v?cid=321
+                }
                 rc=P1_WaitDevice(USLOSS_DISK_DEV, unit, &status);
             }
             deQ(unit);
