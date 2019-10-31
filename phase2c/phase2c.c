@@ -28,7 +28,7 @@ typedef struct Disk{
     DiskRequest *requestQhead;
 }Disk;
 
-static Disk disks[2];
+static Disk disks[USLOSS_DISK_UNITS];
 static int requestSem;
 
 void enQ(int unit, DiskRequest *request){
@@ -64,7 +64,7 @@ P2DiskInit(void)
 {
     int rc;
     // initialize data structures here
-    for(int i=0;i<2;i++){
+    for(int i=0;i<USLOSS_DISK_UNITS;i++){
         disks[i].requestQhead=NULL;
     }
 
@@ -79,10 +79,11 @@ P2DiskInit(void)
     assert(rc == P1_SUCCESS);
 
     // fork the disk drivers here
-    rc = P1_Fork("Disk1_Driver", DiskDriver, (void*) 0, USLOSS_MIN_STACK, 2 , 0, &disks[0].pid);
-    assert(rc == P1_SUCCESS);
-    rc = P1_Fork("Disk2_Driver", DiskDriver, (void*) 1, USLOSS_MIN_STACK, 2 , 0, &disks[1].pid);
-    assert(rc == P1_SUCCESS);
+    for(int i=0;i<USLOSS_DISK_UNITS;i++){
+        rc = P1_Fork("Disk1_Driver", DiskDriver, (void*) i, USLOSS_MIN_STACK, 2 , 0, &disks[i].pid);
+        assert(rc == P1_SUCCESS);
+    }
+
 }
 
 /*
