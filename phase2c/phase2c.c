@@ -79,10 +79,10 @@ P2DiskInit(void)
     assert(rc == P1_SUCCESS);
 
     // fork the disk drivers here
-    for(int i=0;i<USLOSS_DISK_UNITS;i++){
-        rc = P1_Fork("Disk1_Driver", DiskDriver, (void*) i, USLOSS_MIN_STACK, 2 , 0, &disks[i].pid);
-        assert(rc == P1_SUCCESS);
-    }
+    rc = P1_Fork("Disk1_Driver", DiskDriver, (void*) 0, USLOSS_MIN_STACK, 2 , 0, &disks[0].pid);
+    assert(rc == P1_SUCCESS);
+    rc = P1_Fork("Disk2_Driver", DiskDriver, (void*) 1, USLOSS_MIN_STACK, 2 , 0, &disks[1].pid);
+    assert(rc == P1_SUCCESS);
 
 }
 
