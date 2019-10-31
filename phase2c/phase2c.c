@@ -98,7 +98,7 @@ P2DiskShutdown(void)
     int rc;
     int status;
     rc=P1_SemFree(requestSem);
-    for(int i =0;i<2;i++){
+    for(int i =0;i<USLOSS_DISK_UNITS;i++){
         DiskRequest *tmp;
         tmp = disks[i].requestQhead;
         while(disks[i].requestQhead!=NULL){
