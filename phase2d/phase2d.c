@@ -32,17 +32,29 @@ int P2_Startup(void *arg)
     int rc, pid;
 
     // initialize clock and disk drivers
+    P2ClockInit();
+    P2DiskInit();
+    
 
     debug2("starting\n");
     rc = P2_SetSyscallHandler(SYS_SEMCREATE, CreateStub);
     assert(rc == P1_SUCCESS);
-    // ...
+    rc = P2_SetSyscallHandler(SYS_SEMCP, CreateStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMV, CreateStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMFREE, CreateStub);
+    assert(rc == P1_SUCCESS);
+    rc = P2_SetSyscallHandler(SYS_SEMNAME, CreateStub);
+    assert(rc == P1_SUCCESS);
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &pid);
     assert(rc == P1_SUCCESS);
-    // ...
+    
+    P2_Wait(&pid,&rc);
 
     // shut down clock and disk drivers
-
+    P2DiskShutdown();
+    P2ClockShutdown();
     return 0;
 }
 
@@ -51,5 +63,30 @@ CreateStub(USLOSS_Sysargs *sysargs)
 {
     sysargs->arg4 = (void *) P1_SemCreate((char *) sysargs->arg2, (int) sysargs->arg1, 
                                           (void *) &sysargs->arg1);
+}
+
+static void
+PStub(USLOSS_Sysargs *sysargs)
+{
+    sysargs->arg4 = (void *) P1_P((int) sysargs->arg1);
+}
+
+static void
+VStub(USLOSS_Sysargs *sysargs)
+{
+    sysargs->arg4 = (void *) P1_V((int) sysargs->arg1);
+}
+
+
+static void
+FreeStub(USLOSS_Sysargs *sysargs)
+{
+    sysargs->arg4 = (void *) P1_SemFree((int) sysargs->arg1);
+}
+
+static void
+NameStub(USLOSS_Sysargs *sysargs)
+{
+    sysargs->arg4 = (void *) P1_SemCreate((int) sysargs->arg1,(char *) sysargs->arg2);
 }
 
