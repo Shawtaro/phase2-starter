@@ -39,13 +39,13 @@ int P2_Startup(void *arg)
     debug2("starting\n");
     rc = P2_SetSyscallHandler(SYS_SEMCREATE, CreateStub);
     assert(rc == P1_SUCCESS);
-    rc = P2_SetSyscallHandler(SYS_SEMCP, CreateStub);
+    rc = P2_SetSyscallHandler(SYS_SEMP, PStub);
     assert(rc == P1_SUCCESS);
-    rc = P2_SetSyscallHandler(SYS_SEMV, CreateStub);
+    rc = P2_SetSyscallHandler(SYS_SEMV, VStub);
     assert(rc == P1_SUCCESS);
-    rc = P2_SetSyscallHandler(SYS_SEMFREE, CreateStub);
+    rc = P2_SetSyscallHandler(SYS_SEMFREE, FreeStub);
     assert(rc == P1_SUCCESS);
-    rc = P2_SetSyscallHandler(SYS_SEMNAME, CreateStub);
+    rc = P2_SetSyscallHandler(SYS_SEMNAME, NameStub);
     assert(rc == P1_SUCCESS);
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &pid);
     assert(rc == P1_SUCCESS);
