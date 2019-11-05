@@ -10,6 +10,10 @@
 #include "phase2Int.h"
 
 static void     CreateStub(USLOSS_Sysargs *sysargs);
+static void     PStub(USLOSS_Sysargs *sysargs);
+static void     VStub(USLOSS_Sysargs *sysargs);
+static void     FreeStub(USLOSS_Sysargs *sysargs);
+static void     NameStub(USLOSS_Sysargs *sysargs);
 
 /*
  * I left this useful function here for you to use for debugging. If you add -DDEBUG to CFLAGS
@@ -30,13 +34,11 @@ static void debug2(char *fmt, ...)
 int P2_Startup(void *arg)
 {
     int rc, pid;
-
+    int waitPid,status;
     // initialize clock and disk drivers
+    debug2("starting\n");
     P2ClockInit();
     P2DiskInit();
-    
-
-    debug2("starting\n");
     rc = P2_SetSyscallHandler(SYS_SEMCREATE, CreateStub);
     assert(rc == P1_SUCCESS);
     rc = P2_SetSyscallHandler(SYS_SEMP, PStub);
@@ -47,11 +49,11 @@ int P2_Startup(void *arg)
     assert(rc == P1_SUCCESS);
     rc = P2_SetSyscallHandler(SYS_SEMNAME, NameStub);
     assert(rc == P1_SUCCESS);
+    // ...
     rc = P2_Spawn("P3_Startup", P3_Startup, NULL, 4*USLOSS_MIN_STACK, 3, &pid);
     assert(rc == P1_SUCCESS);
-    
-    P2_Wait(&pid,&rc);
-
+    // ...
+    rc = P2_Wait(&waitPid, &status);
     // shut down clock and disk drivers
     P2DiskShutdown();
     P2ClockShutdown();
@@ -68,25 +70,23 @@ CreateStub(USLOSS_Sysargs *sysargs)
 static void
 PStub(USLOSS_Sysargs *sysargs)
 {
-    sysargs->arg4 = (void *) P1_P((int) sysargs->arg1);
+    sysargs->arg4=(void *) P1_P((int) sysargs->arg1);
 }
 
 static void
 VStub(USLOSS_Sysargs *sysargs)
 {
-    sysargs->arg4 = (void *) P1_V((int) sysargs->arg1);
+    sysargs->arg4=(void *) P1_V((int) sysargs->arg1);
 }
-
 
 static void
 FreeStub(USLOSS_Sysargs *sysargs)
 {
-    sysargs->arg4 = (void *) P1_SemFree((int) sysargs->arg1);
+    sysargs->arg4=(void *) P1_SemFree((int) sysargs->arg1);
 }
 
 static void
 NameStub(USLOSS_Sysargs *sysargs)
 {
-    sysargs->arg4 = (void *) P1_SemCreate((int) sysargs->arg1,(char *) sysargs->arg2);
+    sysargs->arg4=(void *) P1_SemName((int) sysargs->arg1,(char*) sysargs->arg2);
 }
-
